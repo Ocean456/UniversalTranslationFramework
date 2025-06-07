@@ -6,6 +6,41 @@
 
 Universal Translation Framework 是一个为RimWorld游戏设计的Mod翻译框架，让你可以轻松翻译任何Mod的界面文本，无需修改原Mod文件。
 
+## 🤔 何时使用这个框架？
+
+### 官方翻译系统 vs Universal Translation Framework
+
+**优先推荐：官方翻译系统** 📚
+
+大部分现代RimWorld Mod都支持官方翻译系统，你只需要在Mod目录下的 `Languages/ChineseSimplified/` 文件夹中添加翻译文件：
+
+```
+ModName/
+├── Languages/
+│   └── ChineseSimplified/
+│       └── Keyed/
+│           └── Keys.xml
+```
+
+**何时需要这个框架？** 🔧
+
+在以下情况下，官方翻译系统无法解决问题，这时就需要Universal Translation Framework：
+
+- ❌ **老旧Mod**：使用硬编码字符串，没有翻译支持
+- ❌ **应急翻译**：新Mod还没有翻译接口时的临时解决方案
+
+### 使用建议 💡
+
+1. **首先检查**：Mod是否已有 `Languages/` 文件夹？
+   - ✅ 有 → 使用官方翻译系统
+   - ❌ 没有 → 使用Universal Translation Framework
+
+2. **实际案例**：
+   - `Prison Labor`、`Hospitality` 等现代Mod → 使用官方翻译
+   - `KillFeed`、老版本Mod → 使用这个框架
+
+3. **性能考虑**：官方翻译系统性能更好，应优先选择
+
 ## ✨ 主要特性
 
 - **🔄 实时翻译**: 游戏运行时动态替换文本
@@ -131,3 +166,21 @@ YourMod/
 
 **Q: 支持正则表达式吗？**
 - 当前版本专注于精确匹配，正则支持在规划中
+
+**Q: 为什么不直接使用官方翻译系统？**
+- 官方翻译系统是首选，但某些情况下不可用：
+  - 老旧Mod使用硬编码字符串
+  - Mod作者未提供翻译支持
+
+## 🛠️ 技术原理
+
+- **Harmony 补丁系统**: 使用IL代码转换器实现运行时字符串替换
+- **智能扫描**: 自动发现并加载翻译补丁，支持并行处理
+- **缓存优化**: 使用高效的缓存机制提升性能
+- **非侵入式**: 不修改原始Mod文件，保持兼容性
+
+## 🔗 相关链接
+
+- [RimWorld 官方网站](https://rimworldgame.com/)
+- [Harmony 补丁库](https://github.com/pardeike/Harmony)
+- [ILSpy 反编译工具](https://github.com/icsharpcode/ILSpy)
