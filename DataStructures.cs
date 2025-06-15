@@ -328,4 +328,49 @@ namespace UniversalTranslationFramework
             return $"Hits: {Hits}, Misses: {Misses}, Hit Rate: {HitRate:P2}";
         }
     }
+
+    /// <summary>
+    /// Performance metrics for translation methods
+    /// </summary>
+    public class PerformanceMetrics
+    {
+        private long _totalCalls = 0;
+        private long _totalTime = 0; // in ticks
+        private long _maxTime = 0;
+        private long _minTime = long.MaxValue;
+
+        public long TotalCalls => _totalCalls;
+        public double AverageTime => _totalCalls > 0 ? (double)_totalTime / _totalCalls / TimeSpan.TicksPerMillisecond : 0;
+        public double MaxTime => (double)_maxTime / TimeSpan.TicksPerMillisecond;
+        public double MinTime => _minTime == long.MaxValue ? 0 : (double)_minTime / TimeSpan.TicksPerMillisecond;
+
+        public void RecordCall(long elapsedTicks)
+        {
+            System.Threading.Interlocked.Increment(ref _totalCalls);
+            System.Threading.Interlocked.Add(ref _totalTime, elapsedTicks);
+            
+            // Update max time
+            long currentMax = _maxTime;
+            while (elapsedTicks > currentMax)
+            {
+                long original = System.Threading.Interlocked.CompareExchange(ref _maxTime, elapsedTicks, currentMax);
+                if (original == currentMax) break;
+                currentMax = original;
+            }
+            
+            // Update min time
+            long currentMin = _minTime;
+            while (elapsedTicks < currentMin)
+            {
+                long original = System.Threading.Interlocked.CompareExchange(ref _minTime, elapsedTicks, currentMin);
+                if (original == currentMin) break;
+                currentMin = original;
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"Calls: {TotalCalls}, Avg: {AverageTime:F2}ms, Max: {MaxTime:F2}ms, Min: {MinTime:F2}ms";
+        }
+    }
 }

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -111,60 +113,70 @@ namespace UniversalTranslationFramework
             
             return result;
         }
+        // 性能优化：缓存已构建的 methodId 和翻译映射
+        private static readonly ConcurrentDictionary<MethodBase, string> _methodIdCache =
+            new ConcurrentDictionary<MethodBase, string>();
+        private static readonly ConcurrentDictionary<MethodBase, ReadOnlyDictionary<string, string>> _methodTranslationCache = 
+            new ConcurrentDictionary<MethodBase, ReadOnlyDictionary<string, string>>();
 
         /// <summary>
-        /// Postfix method for GetGizmos to translate Command_Action labels and descriptions
+        /// High-performance Postfix method for GetGizmos to translate Command_Action labels and descriptions
+        /// 高性能版本的 Postfix 方法，用于翻译 GetGizmos 中的按钮文本
         /// </summary>
         public static IEnumerable<Gizmo> TranslateGizmoLabels(IEnumerable<Gizmo> __result, MethodBase __originalMethod)
         {
-            // Construct the method identifier
-            var methodId = $"{__originalMethod.DeclaringType?.FullName}.{__originalMethod.Name}";
-            
-            // Get the translation mapping for this method
-            var translations = TranslationCache.GetTranslations(methodId);
+            // 性能优化：使用缓存避免重复构建字符串和查找翻译
+            var translations = _methodTranslationCache.GetOrAdd(__originalMethod, method =>
+            {
+                var methodId = _methodIdCache.GetOrAdd(method, m => $"{m.DeclaringType?.FullName}.{m.Name}");
+                return TranslationCache.GetTranslations(methodId);
+            });
             
             if (translations == null || translations.Count == 0)
             {
-                // No translations found; return original gizmos
-                foreach (var gizmo in __result)
-                    yield return gizmo;
-                yield break;
+                // 无翻译时直接返回，避免不必要的 yield 开销
+                return __result;
             }
 
-            foreach (var gizmo in __result)
+            // 使用局部函数避免闭包分配
+            return TranslateGizmosInternal(__result, translations);
+        }
+
+        private static IEnumerable<Gizmo> TranslateGizmosInternal(IEnumerable<Gizmo> gizmos, ReadOnlyDictionary<string, string> translations)
+        {
+            foreach (var gizmo in gizmos)
             {
-                // Translate Command_Action labels and descriptions
-                if (gizmo is Command_Action commandAction)
+                // 性能优化：减少类型检查和字符串操作
+                switch (gizmo)
                 {
-                    if (!string.IsNullOrEmpty(commandAction.defaultLabel) && 
-                        translations.TryGetValue(commandAction.defaultLabel, out var translatedLabel))
-                    {
-                        commandAction.defaultLabel = translatedLabel;
-                    }
-                    
-                    if (!string.IsNullOrEmpty(commandAction.defaultDesc) && 
-                        translations.TryGetValue(commandAction.defaultDesc, out var translatedDesc))
-                    {
-                        commandAction.defaultDesc = translatedDesc;
-                    }
-                }
-                // Handle other Gizmo types if needed
-                else if (gizmo is Command command)
-                {
-                    if (!string.IsNullOrEmpty(command.defaultLabel) && 
-                        translations.TryGetValue(command.defaultLabel, out var translatedLabel))
-                    {
-                        command.defaultLabel = translatedLabel;
-                    }
-                    
-                    if (!string.IsNullOrEmpty(command.defaultDesc) && 
-                        translations.TryGetValue(command.defaultDesc, out var translatedDesc))
-                    {
-                        command.defaultDesc = translatedDesc;
-                    }
+                    case Command_Action commandAction:
+                        TranslateCommandProperties(commandAction, translations);
+                        break;
+                    case Command command:
+                        TranslateCommandProperties(command, translations);
+                        break;
                 }
                 
                 yield return gizmo;
+            }
+        }
+
+        // 内联方法，减少方法调用开销
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static void TranslateCommandProperties(Command command, ReadOnlyDictionary<string, string> translations)
+        {
+            // 只有当标签不为空时才进行查找
+            if (!string.IsNullOrEmpty(command.defaultLabel) && 
+                translations.TryGetValue(command.defaultLabel, out var translatedLabel))
+            {
+                command.defaultLabel = translatedLabel;
+            }
+            
+            // 只有当描述不为空时才进行查找
+            if (!string.IsNullOrEmpty(command.defaultDesc) && 
+                translations.TryGetValue(command.defaultDesc, out var translatedDesc))
+            {
+                command.defaultDesc = translatedDesc;
             }
         }
     }
