@@ -365,15 +365,20 @@ namespace UniversalTranslationFramework
 
                 // Cache translation map
                 var methodId = $"{targetType.FullName}.{targetMethod.Name}";
-                TranslationCache.RegisterTranslations(methodId, translationMap);
-
-                // Apply appropriate patch based on method characteristics
+                TranslationCache.RegisterTranslations(methodId, translationMap);                // Apply appropriate patch based on method characteristics
                 if (IsGetGizmosMethod(targetMethod))
                 {
-                    // For GetGizmos methods, use Postfix to translate Command_Action properties
+                    // For GetGizmos methods, use BOTH Transpiler and Postfix
+                    // Transpiler handles string literals in the method body
+                    var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));
+                    // Postfix handles dynamic Command_Action properties
                     var postfixMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.TranslateGizmoLabels));
-                    _harmony.Patch(targetMethod, postfix: new HarmonyMethod(postfixMethod));
-                    Log.Message($"[UTF] Gizmo translation patch applied: {patch.TargetTypeName}.{patch.TargetMethodName} ({patch.Translations.Count} strings)");
+                    
+                    _harmony.Patch(targetMethod, 
+                        transpiler: new HarmonyMethod(transpilerMethod),
+                        postfix: new HarmonyMethod(postfixMethod));
+                    
+                    Log.Message($"[UTF] Complete Gizmo translation patch applied: {patch.TargetTypeName}.{patch.TargetMethodName} (Transpiler + Postfix, {patch.Translations.Count} strings)");
                 }
                 else
                 {
