@@ -47,6 +47,7 @@ ModName/
 - **📦 自动发现**: 自动扫描并加载翻译补丁
 - **✏️ 简单配置**: 只需编写简单的XML文件
 - **🎯 精确匹配**: 准确替换指定的文本内容
+- **🎮 智能识别**: 自动识别 GetGizmos 方法，支持按钮文本翻译
 
 ## 🚀 快速使用
 
@@ -133,8 +134,47 @@ YourMod/
       </li>
     </replacements>
   </Operation>
+
+  <!-- 翻译 GetGizmos 方法中的按钮文本 -->
+  <Operation Class="UniversalTranslationFramework.PatchOperationStringTranslate">
+    <targetType>MechCaller.MechConsole</targetType>
+    <targetMethod>GetGizmos</targetMethod>
+    <replacements>
+      <li>
+        <find>Mechanoid Raid</find>
+        <replace>机械族袭击</replace>
+      </li>
+      <li>
+        <find>Mechanoid Cluster</find>
+        <replace>机械族集群</replace>
+      </li>
+      <li>
+        <find>Imitate a mech distress beacon! Enemy reinforcements will be here soon!</find>
+        <replace>模拟机械族求救信号！敌方增援很快就会到达！</replace>
+      </li>
+      <li>
+        <find>On Cooldown!</find>
+        <replace>冷却中！</replace>
+      </li>
+    </replacements>
+  </Operation>
 </Patch>
 ```
+
+## 🎮 特殊方法支持
+
+### GetGizmos 方法翻译
+
+框架能够智能识别 `GetGizmos` 方法（返回 `IEnumerable<Gizmo>` 的方法），并使用特殊的翻译策略：
+
+- **自动识别**：无需特殊配置，框架会自动检测 GetGizmos 方法
+- **运行时翻译**：翻译在方法执行后进行，确保动态创建的按钮也能被翻译
+- **支持类型**：
+  - `Command_Action`（按钮）
+  - `Command`（基础命令）
+  - 其他 Gizmo 类型
+
+这解决了建筑物按钮、单位命令等界面元素的翻译问题。
 
 ## 🔍 如何找到要翻译的类和方法？
 

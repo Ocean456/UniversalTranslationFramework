@@ -2,7 +2,9 @@
 
 bin/
 obj/
+xml/
 packages/
+markdown/
 
 *.dll
 *.pdb

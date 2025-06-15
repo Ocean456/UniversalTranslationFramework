@@ -17,6 +17,7 @@ namespace UniversalTranslationFramework
     {
         /// <summary>
         /// Harmony transpiler method: replaces string constants in the target method (optimized version)
+        /// Also handles property assignments like defaultLabel = "text"
         /// </summary>
         /// <param name="instructions">Original IL instruction sequence</param>
         /// <param name="original">Original method being patched</param>
@@ -109,6 +110,62 @@ namespace UniversalTranslationFramework
             }
             
             return result;
+        }
+
+        /// <summary>
+        /// Postfix method for GetGizmos to translate Command_Action labels and descriptions
+        /// </summary>
+        public static IEnumerable<Gizmo> TranslateGizmoLabels(IEnumerable<Gizmo> __result, MethodBase __originalMethod)
+        {
+            // Construct the method identifier
+            var methodId = $"{__originalMethod.DeclaringType?.FullName}.{__originalMethod.Name}";
+            
+            // Get the translation mapping for this method
+            var translations = TranslationCache.GetTranslations(methodId);
+            
+            if (translations == null || translations.Count == 0)
+            {
+                // No translations found; return original gizmos
+                foreach (var gizmo in __result)
+                    yield return gizmo;
+                yield break;
+            }
+
+            foreach (var gizmo in __result)
+            {
+                // Translate Command_Action labels and descriptions
+                if (gizmo is Command_Action commandAction)
+                {
+                    if (!string.IsNullOrEmpty(commandAction.defaultLabel) && 
+                        translations.TryGetValue(commandAction.defaultLabel, out var translatedLabel))
+                    {
+                        commandAction.defaultLabel = translatedLabel;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(commandAction.defaultDesc) && 
+                        translations.TryGetValue(commandAction.defaultDesc, out var translatedDesc))
+                    {
+                        commandAction.defaultDesc = translatedDesc;
+                    }
+                }
+                // Handle other Gizmo types if needed
+                else if (gizmo is Command command)
+                {
+                    if (!string.IsNullOrEmpty(command.defaultLabel) && 
+                        translations.TryGetValue(command.defaultLabel, out var translatedLabel))
+                    {
+                        command.defaultLabel = translatedLabel;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(command.defaultDesc) && 
+                        translations.TryGetValue(command.defaultDesc, out var translatedDesc))
+                    {
+                        command.defaultDesc = translatedDesc;
+                    }
+                }
+                
+                yield return gizmo;
+            }
         }
     }
 

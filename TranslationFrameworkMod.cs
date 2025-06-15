@@ -340,7 +340,7 @@ namespace UniversalTranslationFramework
 
             Log.Message($"[UTF] Patch application complete: {appliedCount} succeeded, {failedCount} failed");
         }
-
+        
         /// <summary>
         /// Apply a single translation patch (compatible version)
         /// </summary>
@@ -367,11 +367,22 @@ namespace UniversalTranslationFramework
                 var methodId = $"{targetType.FullName}.{targetMethod.Name}";
                 TranslationCache.RegisterTranslations(methodId, translationMap);
 
-                // Apply Harmony patch
-                var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));
-                _harmony.Patch(targetMethod, transpiler: new HarmonyMethod(transpilerMethod));
+                // Apply appropriate patch based on method characteristics
+                if (IsGetGizmosMethod(targetMethod))
+                {
+                    // For GetGizmos methods, use Postfix to translate Command_Action properties
+                    var postfixMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.TranslateGizmoLabels));
+                    _harmony.Patch(targetMethod, postfix: new HarmonyMethod(postfixMethod));
+                    Log.Message($"[UTF] Gizmo translation patch applied: {patch.TargetTypeName}.{patch.TargetMethodName} ({patch.Translations.Count} strings)");
+                }
+                else
+                {
+                    // For regular methods, use Transpiler to replace string constants
+                    var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));
+                    _harmony.Patch(targetMethod, transpiler: new HarmonyMethod(transpilerMethod));
+                    Log.Message($"[UTF] String translation patch applied: {patch.TargetTypeName}.{patch.TargetMethodName} ({patch.Translations.Count} strings)");
+                }
 
-                Log.Message($"[UTF] Translation patch applied: {patch.TargetTypeName}.{patch.TargetMethodName} ({patch.Translations.Count} strings)");
                 return true;
             }
             catch (Exception ex)
@@ -379,6 +390,15 @@ namespace UniversalTranslationFramework
                 Log.Error($"[UTF] Exception in ApplyTranslationPatchOptimized: {ex}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Check if the method is a GetGizmos method that returns IEnumerable<Gizmo>
+        /// </summary>
+        private static bool IsGetGizmosMethod(MethodInfo method)
+        {
+            return method.Name == "GetGizmos" && 
+                   typeof(IEnumerable<Gizmo>).IsAssignableFrom(method.ReturnType);
         }
 
         /// <summary>
