@@ -37,7 +37,7 @@ namespace UniversalTranslationFramework
         static TranslationFrameworkMod()
         {
             // 使用LongEventHandler进行异步初始化，避免阻塞游戏启动
-            LongEventHandler.QueueLongEvent(() => InitializeFramework(), "Loading Universal Translation Framework", false, null);
+            LongEventHandler.QueueLongEvent(() => InitializeFramework(), "Loading Universal Translation Framework", false, null, showExtraUIInfo: false, forceHideUI: false);
         }
 
         private static void InitializeFramework()
@@ -139,8 +139,6 @@ namespace UniversalTranslationFramework
 
             try
             {
-                Log.Message($"[UTF] Scanning Patches directory of mod '{mod.Name}': {patchesDir}");
-                
                 // 使用EnumerateFiles避免一次性加载所有文件到内存
                 var translationFiles = Directory.EnumerateFiles(patchesDir, "*StringTranslation*.xml", 
                     SearchOption.AllDirectories);
@@ -152,7 +150,7 @@ namespace UniversalTranslationFramework
                         var filePatches = LoadTranslationPatchesFromFileOptimized(filePath, mod);
                         patches.AddRange(filePatches);
                         
-                        Log.Message($"[UTF] Loaded {filePatches.Count} translation patches from {Path.GetFileName(filePath)}");
+                        Log.Message($"[UTF] Loaded {filePatches.Count} translation patches from {filePath}");
                     }
                     catch (Exception ex)
                     {
