@@ -56,7 +56,7 @@ namespace UniversalTranslationFramework
             
             if (replacedCount > 0)
             {
-                Log.Message($"[UTF] Replaced {replacedCount} strings in {methodId}");
+                // Log.Message($"[UTF] Replaced {replacedCount} strings in {methodId}");
             }
             
             return instructionList;
