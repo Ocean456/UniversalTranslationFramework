@@ -439,12 +439,22 @@ namespace UniversalTranslationFramework
                 // Cache translation map
                 var methodId = $"{actualTargetType.FullName}.{actualMethodName}";
                 TranslationCache.RegisterTranslations(methodId, translationMap);
-
-                // Apply Harmony patch
-                var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));
+                // Apply Harmony patch with smart transpiler selection
+                var methodComplexity = AnalyzeMethodComplexity(targetMethod);
+                var requiresSpecialHandling = RequiresSpecialHandling(targetMethod);
+                var useSafeMode = methodComplexity.IsComplex || requiresSpecialHandling;
+                
+                var transpilerMethod = useSafeMode 
+                    ? typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStringsSafe))
+                    : typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));
+                
                 _harmony.Patch(targetMethod, transpiler: new HarmonyMethod(transpilerMethod));
 
-                Log.Message($"[UTF] Translation patch applied: {actualTargetType.FullName}.{actualMethodName} ({patch.Translations.Count} strings)");
+                var modeDescription = useSafeMode 
+                    ? $"safe mode (complex: {methodComplexity.IsComplex}, special: {requiresSpecialHandling})"
+                    : "standard mode";
+                    
+                Log.Message($"[UTF] Translation patch applied: {actualTargetType.FullName}.{actualMethodName} ({patch.Translations.Count} strings, {modeDescription})");
                 return true;
             }
             catch (Exception ex)
@@ -454,6 +464,89 @@ namespace UniversalTranslationFramework
             }
         }
 
+        /// <summary>
+        /// Analyze method complexity to determine the best transpiler approach
+        /// </summary>
+        private static MethodComplexityInfo AnalyzeMethodComplexity(MethodInfo method)
+        {
+            try
+            {
+                var complexity = new MethodComplexityInfo();
+                
+                // 获取方法的 IL 字节码
+                var methodBody = method.GetMethodBody();
+                if (methodBody == null)
+                {
+                    complexity.IsComplex = false;
+                    return complexity;
+                }
+                
+                var ilBytes = methodBody.GetILAsByteArray();
+                if (ilBytes == null || ilBytes.Length == 0)
+                {
+                    complexity.IsComplex = false;
+                    return complexity;
+                }
+                
+                // 分析 IL 复杂性指标
+                complexity.ILSize = ilBytes.Length;
+                complexity.LocalVariablesCount = methodBody.LocalVariables?.Count ?? 0;
+                complexity.ExceptionHandlersCount = methodBody.ExceptionHandlingClauses?.Count ?? 0;
+                
+                // 计算分支指令数量（简化分析）
+                int branchCount = 0;
+                for (int i = 0; i < ilBytes.Length - 1; i++)
+                {
+                    var opcode = ilBytes[i];
+                    // 检查常见的分支指令 opcode
+                    if (opcode == 0x2B || // br.s
+                        opcode == 0x38 || // br
+                        opcode == 0x2C || // brfalse.s
+                        opcode == 0x39 || // brfalse
+                        opcode == 0x2D || // brtrue.s
+                        opcode == 0x3A || // brtrue
+                        opcode == 0x2E || // bge.s
+                        opcode == 0x3C || // bge
+                        opcode == 0x2F || // bgt.s
+                        opcode == 0x3D || // bgt
+                        opcode == 0x30 || // ble.s
+                        opcode == 0x3E || // ble
+                        opcode == 0x31 || // blt.s
+                        opcode == 0x3F || // blt
+                        opcode == 0x32 || // bne.un.s
+                        opcode == 0x40 || // bne.un
+                        opcode == 0x33 || // bge.un.s
+                        opcode == 0x41 || // bge.un
+                        opcode == 0x34 || // bgt.un.s
+                        opcode == 0x42 || // bgt.un
+                        opcode == 0x35 || // ble.un.s
+                        opcode == 0x43 || // ble.un
+                        opcode == 0x36 || // blt.un.s
+                        opcode == 0x44)   // blt.un
+                    {
+                        branchCount++;
+                    }
+                }
+                
+                complexity.BranchCount = branchCount;
+                
+                // 复杂性判断规则
+                complexity.IsComplex = 
+                    complexity.ILSize > 200 ||           // IL 代码超过 200 字节
+                    complexity.BranchCount > 10 ||       // 分支指令超过 10 个
+                    complexity.LocalVariablesCount > 8 || // 局部变量超过 8 个
+                    complexity.ExceptionHandlersCount > 0; // 有异常处理
+                
+                return complexity;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[UTF] Failed to analyze method complexity for {method.Name}: {ex.Message}");
+                // 如果分析失败，默认使用安全模式
+                return new MethodComplexityInfo { IsComplex = true };
+            }
+        }
+        
         /// <summary>
         /// Find type by name, optionally from a specific assembly (optimized version with caching)
         /// </summary>
@@ -816,6 +909,104 @@ namespace UniversalTranslationFramework
             }
         }
 
+        /// <summary>
+        /// Detect if a method has known problematic patterns that require special handling
+        /// </summary>
+        private static bool RequiresSpecialHandling(MethodInfo method)
+        {
+            try
+            {
+                var methodSignature = $"{method.DeclaringType?.FullName}.{method.Name}";
+                
+                // Known problematic methods that require safe mode
+                var problematicMethods = new[]
+                {
+                    "CompDesiccationTimer.CompInspectStringExtra",
+                    // 可以在这里添加其他已知的复杂方法
+                };
+                
+                if (problematicMethods.Contains(methodSignature))
+                {
+                    Log.Message($"[UTF] Method {methodSignature} is in problematic methods list, using safe mode");
+                    return true;
+                }
+                
+                // 检查方法体是否包含复杂的控制流模式
+                var methodBody = method.GetMethodBody();
+                if (methodBody != null)
+                {
+                    var ilBytes = methodBody.GetILAsByteArray();
+                    if (ilBytes != null)
+                    {
+                        // 检查是否包含大量连续的分支指令（如复杂的 if-else 链）
+                        int consecutiveBranches = 0;
+                        int maxConsecutiveBranches = 0;
+                        
+                        for (int i = 0; i < ilBytes.Length - 1; i++)
+                        {
+                            var opcode = ilBytes[i];
+                            bool isBranch = IsBranchOpCode(opcode);
+                            
+                            if (isBranch)
+                            {
+                                consecutiveBranches++;
+                                maxConsecutiveBranches = Math.Max(maxConsecutiveBranches, consecutiveBranches);
+                            }
+                            else
+                            {
+                                consecutiveBranches = 0;
+                            }
+                        }
+                        
+                        // 如果有超过 5 个连续的分支指令，认为需要特殊处理
+                        if (maxConsecutiveBranches > 5)
+                        {
+                            Log.Message($"[UTF] Method {methodSignature} has {maxConsecutiveBranches} consecutive branches, using safe mode");
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[UTF] Error checking if method requires special handling: {ex.Message}");
+                return true; // 如果检测失败，默认使用安全模式
+            }
+        }
+        
+        /// <summary>
+        /// Check if an opcode is a branch instruction
+        /// </summary>
+        private static bool IsBranchOpCode(byte opcode)
+        {
+            return opcode == 0x2B || // br.s
+                   opcode == 0x38 || // br
+                   opcode == 0x2C || // brfalse.s
+                   opcode == 0x39 || // brfalse
+                   opcode == 0x2D || // brtrue.s
+                   opcode == 0x3A || // brtrue
+                   opcode == 0x2E || // bge.s
+                   opcode == 0x3C || // bge
+                   opcode == 0x2F || // bgt.s
+                   opcode == 0x3D || // bgt
+                   opcode == 0x30 || // ble.s
+                   opcode == 0x3E || // ble
+                   opcode == 0x31 || // blt.s
+                   opcode == 0x3F || // blt
+                   opcode == 0x32 || // bne.un.s
+                   opcode == 0x40 || // bne.un
+                   opcode == 0x33 || // bge.un.s
+                   opcode == 0x41 || // bge.un
+                   opcode == 0x34 || // bgt.un.s
+                   opcode == 0x42 || // bgt.un
+                   opcode == 0x35 || // ble.un.s
+                   opcode == 0x43 || // ble.un
+                   opcode == 0x36 || // blt.un.s
+                   opcode == 0x44;   // blt.un
+        }
+        
         /// <summary>
         /// Get initialization status
         /// </summary>

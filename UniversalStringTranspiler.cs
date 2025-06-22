@@ -16,7 +16,7 @@ namespace UniversalTranslationFramework
     public static class UniversalStringTranspiler
     {
         /// <summary>
-        /// Harmony transpiler method: replaces string constants in the target method (optimized version)
+        /// Harmony transpiler method: replaces string constants in the target method (safe version)
         /// </summary>
         /// <param name="instructions">Original IL instruction sequence</param>
         /// <param name="original">Original method being patched</param>
@@ -25,41 +25,64 @@ namespace UniversalTranslationFramework
         {
             // Construct the method identifier
             var methodId = $"{original.DeclaringType?.FullName}.{original.Name}";
-            
+
             // Get the translation mapping for this method
             var translations = TranslationCache.GetTranslations(methodId);
-            
+
             if (translations == null || translations.Count == 0)
             {
                 // No translations found; return the original instructions directly
                 return instructions;
             }
 
-            var instructionList = instructions.ToList(); // 转换一次，避免多次枚举
-            var replacedCount = 0;
-            
-            // Iterate over all IL instructions
-            for (int i = 0; i < instructionList.Count; i++)
+            try
             {
-                var instruction = instructionList[i];
-                
-                // Check if it's a string load instruction (ldstr)
-                if (instruction.opcode == OpCodes.Ldstr && 
-                    instruction.operand is string originalString &&
-                    translations.TryGetValue(originalString, out var translatedString))
+                var instructionList = instructions.ToList(); // 转换一次，避免多次枚举
+                var replacedCount = 0;
+
+                // 安全处理：创建新的指令列表，保持所有标签和引用
+                var newInstructions = new List<CodeInstruction>();
+
+                // Iterate over all IL instructions
+                for (int i = 0; i < instructionList.Count; i++)
                 {
-                    // Replace with the translated string
-                    instructionList[i] = new CodeInstruction(OpCodes.Ldstr, translatedString);
-                    replacedCount++;
+                    var instruction = instructionList[i];
+
+                    // Check if it's a string load instruction (ldstr)
+                    if (instruction.opcode == OpCodes.Ldstr &&
+                        instruction.operand is string originalString &&
+                        translations.TryGetValue(originalString, out var translatedString))
+                    {
+                        // 创建新的指令，但保持原始指令的所有属性（标签、块等）
+                        var newInstruction = new CodeInstruction(OpCodes.Ldstr, translatedString)
+                        {
+                            labels = instruction.labels != null ? new List<Label>(instruction.labels) : new List<Label>(),
+                            blocks = instruction.blocks != null ? new List<ExceptionBlock>(instruction.blocks) : new List<ExceptionBlock>()
+                        };
+
+                        newInstructions.Add(newInstruction);
+                        replacedCount++;
+                    }
+                    else
+                    {
+                        // 保持原始指令不变
+                        newInstructions.Add(instruction);
+                    }
                 }
+
+                if (replacedCount > 0)
+                {
+                    Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId}");
+                }
+
+                return newInstructions;
             }
-            
-            if (replacedCount > 0)
+            catch (Exception ex)
             {
-                // Log.Message($"[UTF] Replaced {replacedCount} strings in {methodId}");
+                Log.Warning($"[UTF] Transpiler failed for {methodId}, falling back to original: {ex.Message}");
+                // 如果转译失败，返回原始指令序列
+                return instructions;
             }
-            
-            return instructionList;
         }
 
         /// <summary>
@@ -109,6 +132,104 @@ namespace UniversalTranslationFramework
             }
             
             return result;
+        }
+
+        /// <summary>
+        /// Ultra-safe transpiler method: for complex methods with many branches and labels
+        /// This method preserves all instruction metadata including labels, blocks, and exception handlers
+        /// </summary>
+        /// <param name="instructions">Original IL instruction sequence</param>
+        /// <param name="original">Original method being patched</param>
+        /// <returns>Modified IL instruction sequence</returns>
+        public static IEnumerable<CodeInstruction> ReplaceStringsSafe(IEnumerable<CodeInstruction> instructions, MethodBase original)
+        {
+            // Construct the method identifier
+            var methodId = $"{original.DeclaringType?.FullName}.{original.Name}";
+            
+            // Get the translation mapping for this method
+            var translations = TranslationCache.GetTranslations(methodId);
+            
+            if (translations == null || translations.Count == 0)
+            {
+                // No translations found; return the original instructions directly
+                return instructions;
+            }
+
+            try
+            {
+                var instructionList = instructions.ToList();
+                var replacedCount = 0;
+                bool hasComplexFlow = false;
+                
+                // 预检查：检测是否有复杂的控制流
+                foreach (var instruction in instructionList)
+                {
+                    if (instruction.labels?.Count > 0 || instruction.blocks?.Count > 0)
+                    {
+                        hasComplexFlow = true;
+                        break;
+                    }
+                }
+                
+                if (hasComplexFlow)
+                {
+                    Log.Message($"[UTF] Detected complex control flow in {methodId}, using safe mode");
+                    
+                    // 对于复杂控制流，使用最安全的方式：只替换操作数，不创建新指令
+                    for (int i = 0; i < instructionList.Count; i++)
+                    {
+                        var instruction = instructionList[i];
+                        
+                        if (instruction.opcode == OpCodes.Ldstr && 
+                            instruction.operand is string originalString &&
+                            translations.TryGetValue(originalString, out var translatedString))
+                        {
+                            // 只替换操作数，保持指令对象本身不变
+                            instruction.operand = translatedString;
+                            replacedCount++;
+                        }
+                    }
+                }
+                else
+                {
+                    // 对于简单控制流，使用标准方式
+                    for (int i = 0; i < instructionList.Count; i++)
+                    {
+                        var instruction = instructionList[i];
+                        
+                        if (instruction.opcode == OpCodes.Ldstr && 
+                            instruction.operand is string originalString &&
+                            translations.TryGetValue(originalString, out var translatedString))
+                        {
+                            // 创建新指令，保持所有元数据
+                            var newInstruction = new CodeInstruction(OpCodes.Ldstr, translatedString);
+                            
+                            // 复制所有元数据
+                            if (instruction.labels != null)
+                                newInstruction.labels = new List<Label>(instruction.labels);
+                            if (instruction.blocks != null)
+                                newInstruction.blocks = new List<ExceptionBlock>(instruction.blocks);
+                            
+                            instructionList[i] = newInstruction;
+                            replacedCount++;
+                        }
+                    }
+                }
+                
+                if (replacedCount > 0)
+                {
+                    Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId} (complex flow: {hasComplexFlow})");
+                }
+                
+                return instructionList;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[UTF] Safe transpiler failed for {methodId}: {ex.Message}");
+                Log.Error($"[UTF] Stack trace: {ex.StackTrace}");
+                // 如果连安全模式都失败，返回原始指令
+                return instructions;
+            }
         }
     }
 

@@ -328,4 +328,41 @@ namespace UniversalTranslationFramework
             return $"Hits: {Hits}, Misses: {Misses}, Hit Rate: {HitRate:P2}";
         }
     }
+
+    /// <summary>
+    /// Method complexity analysis information
+    /// </summary>
+    public class MethodComplexityInfo
+    {
+        /// <summary>
+        /// Whether the method is considered complex
+        /// </summary>
+        public bool IsComplex { get; set; }
+        
+        /// <summary>
+        /// Size of IL bytecode in bytes
+        /// </summary>
+        public int ILSize { get; set; }
+        
+        /// <summary>
+        /// Number of local variables
+        /// </summary>
+        public int LocalVariablesCount { get; set; }
+        
+        /// <summary>
+        /// Number of exception handlers
+        /// </summary>
+        public int ExceptionHandlersCount { get; set; }
+        
+        /// <summary>
+        /// Number of branch instructions
+        /// </summary>
+        public int BranchCount { get; set; }
+        
+        public override string ToString()
+        {
+            return $"Complex: {IsComplex}, IL Size: {ILSize}, Variables: {LocalVariablesCount}, " +
+                   $"Exceptions: {ExceptionHandlersCount}, Branches: {BranchCount}";
+        }
+    }
 }
