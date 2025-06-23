@@ -31,7 +31,7 @@ namespace UniversalTranslationFramework
 
                 if (xmlContent.StartsWith("<!--"))
                 {
-                    Log.Warning($"[UTF] Failed to generate state machine patch: {xmlContent}");
+                    UTF_Log.Warning($"[UTF] Failed to generate state machine patch: {xmlContent}");
                     return false;
                 }
 
@@ -43,12 +43,12 @@ namespace UniversalTranslationFramework
                 }
 
                 File.WriteAllText(outputPath, xmlContent);
-                Log.Message($"[UTF] State machine patch generated: {outputPath}");
+                UTF_Log.Message($"[UTF] State machine patch generated: {outputPath}");
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error generating state machine patch: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error generating state machine patch: {ex.Message}");
                 return false;
             }
         }
@@ -71,7 +71,7 @@ namespace UniversalTranslationFramework
 
                 if (type == null)
                 {
-                    Log.Warning($"[UTF] Could not find type: {typeName}");
+                    UTF_Log.Warning($"[UTF] Could not find type: {typeName}");
                     return results;
                 }
 
@@ -100,11 +100,11 @@ namespace UniversalTranslationFramework
                     }
                 }
 
-                Log.Message($"[UTF] Found {results.Count} state machine methods in {typeName}");
+                UTF_Log.Message($"[UTF] Found {results.Count} state machine methods in {typeName}");
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error scanning state machine methods: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error scanning state machine methods: {ex.Message}");
             }
 
             return results;

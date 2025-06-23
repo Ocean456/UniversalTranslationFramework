@@ -35,9 +35,19 @@
     <ItemGroup>
         <Reference Include="0Harmony, Version=2.3.6.0, Culture=neutral, processorArchitecture=MSIL">
           <HintPath>packages\Lib.Harmony.2.3.6\lib\net472\0Harmony.dll</HintPath>
-        </Reference>
-        <Reference Include="Assembly-CSharp">
+        </Reference>        <Reference Include="Assembly-CSharp">
           <HintPath>..\..\..\..\Program Files\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+          <Private>False</Private>
+        </Reference>        <Reference Include="UnityEngine.CoreModule">
+          <HintPath>..\..\..\..\Program Files\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+          <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+          <HintPath>..\..\..\..\Program Files\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+          <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+          <HintPath>..\..\..\..\Program Files\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
           <Private>False</Private>
         </Reference>
         <Reference Include="mscorlib" />        <Reference Include="System" />        <Reference Include="System.Buffers, Version=4.0.4.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -61,6 +71,8 @@
         <Compile Include="TranslationFrameworkMod.cs" />
         <Compile Include="DataStructures.cs" />
         <Compile Include="UniversalStringTranspiler.cs" />
+        <Compile Include="UTF_Settings.cs" />
+        <Compile Include="UTF_Mod.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
     </ItemGroup>
     <ItemGroup>

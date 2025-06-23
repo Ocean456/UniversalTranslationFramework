@@ -10,8 +10,74 @@ using System.Xml.Linq;
 using HarmonyLib;
 using Verse;
 
-namespace UniversalTranslationFramework
+/// <summary>
+/// 日志级别枚举
+/// </summary>
+public enum LogLevel
 {
+    None = 0,
+    Error = 1,
+    Warning = 2,
+    Message = 3,
+    Debug = 4
+}
+
+namespace UniversalTranslationFramework
+{    /// <summary>
+    /// 日志助手类，支持设置控制的日志级别
+    /// </summary>
+    public static class UTF_Log
+    {
+        /// <summary>
+        /// 当前日志级别设置
+        /// </summary>
+        public static LogLevel CurrentLogLevel { get; set; } = LogLevel.Message;
+
+        /// <summary>
+        /// 检查是否应该输出指定级别的日志
+        /// </summary>
+        private static bool ShouldLog(LogLevel level)
+        {
+            return (int)level <= (int)CurrentLogLevel;
+        }
+
+        /// <summary>
+        /// 输出错误日志
+        /// </summary>
+        public static void Error(string message)
+        {
+            if (ShouldLog(LogLevel.Error))
+                UTF_Log.Error(message);
+        }
+
+        /// <summary>
+        /// 输出警告日志
+        /// </summary>
+        public static void Warning(string message)
+        {
+            if (ShouldLog(LogLevel.Warning))
+                UTF_Log.Warning(message);
+        }
+
+        /// <summary>
+        /// 输出一般消息日志
+        /// </summary>
+        public static void Message(string message)
+        {
+            if (ShouldLog(LogLevel.Message))
+                UTF_Log.Message(message);
+        }
+
+        /// <summary>
+        /// 输出调试日志
+        /// </summary>
+        public static void Debug(string message)
+        {
+            if (ShouldLog(LogLevel.Debug))
+                UTF_Log.Message($"[DEBUG] {message}");
+        }
+    }
+
     /// <summary>
     /// Main entry point for the Universal Translation Framework - RimWorld Mod
     /// Compatible version without System.Collections.Immutable dependency
@@ -50,7 +116,7 @@ namespace UniversalTranslationFramework
                 
                 try
                 {
-                    Log.Message("[UTF] Universal Translation Framework is starting...");
+                    UTF_Log.Message("[UTF] Universal Translation Framework is starting...");
                     
                     _harmony = new Harmony(FRAMEWORK_HARMONY_ID);
                     
@@ -58,12 +124,12 @@ namespace UniversalTranslationFramework
                     var patches = _patches.Value;
                     ApplyAllPatches(patches);
                     
-                    // Log.Message($"[UTF] Universal Translation Framework started successfully! Loaded {patches.Count} translation patches.");
+                    // UTF_Log.Message($"[UTF] Universal Translation Framework started successfully! Loaded {patches.Count} translation patches.");
                     _initialized = true;
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"[UTF] Failed to start Universal Translation Framework: {ex}");
+                    UTF_Log.Error($"[UTF] Failed to start Universal Translation Framework: {ex}");
                 }
             }
         }
@@ -108,7 +174,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error during parallel processing, falling back to sequential: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error during parallel processing, falling back to sequential: {ex.Message}");
                 
                 // Fallback to single-threaded processing
                 discoveredPatches.Clear();
@@ -121,7 +187,7 @@ namespace UniversalTranslationFramework
                     }
                     catch (Exception modEx)
                     {
-                        Log.Error($"[UTF] Error scanning mod {mod.Name}: {modEx.Message}");
+                        UTF_Log.Error($"[UTF] Error scanning mod {mod.Name}: {modEx.Message}");
                     }
                 }
             }
@@ -139,7 +205,7 @@ namespace UniversalTranslationFramework
 
             try
             {
-                // Log.Message($"[UTF] Scanning Patches directory of mod '{mod.Name}': {patchesDir}");
+                // UTF_Log.Message($"[UTF] Scanning Patches directory of mod '{mod.Name}': {patchesDir}");
                 
                 // Use EnumerateFiles to avoid loading all files into memory at once
                 var translationFiles = Directory.EnumerateFiles(patchesDir, "*StringTranslation*.xml", 
@@ -152,17 +218,17 @@ namespace UniversalTranslationFramework
                         var filePatches = LoadTranslationPatchesFromFileOptimized(filePath, mod);
                         patches.AddRange(filePatches);
                         
-                        Log.Message($"[UTF] Loaded {filePatches.Count} translation patches from {Path.GetFileName(filePath)}");
+                        UTF_Log.Message($"[UTF] Loaded {filePatches.Count} translation patches from {Path.GetFileName(filePath)}");
                     }
                     catch (Exception ex)
                     {
-                        Log.Error($"[UTF] Failed to load translation patch file {filePath}: {ex.Message}");
+                        UTF_Log.Error($"[UTF] Failed to load translation patch file {filePath}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error occurred while scanning mod '{mod.Name}': {ex.Message}");
+                UTF_Log.Error($"[UTF] Error occurred while scanning mod '{mod.Name}': {ex.Message}");
             }
 
             return patches;
@@ -203,7 +269,7 @@ namespace UniversalTranslationFramework
 
                 if (root?.Name != "Patch")
                 {
-                    Log.Warning($"[UTF] Invalid patch file format {filePath}: Root element must be <Patch>");
+                    UTF_Log.Warning($"[UTF] Invalid patch file format {filePath}: Root element must be <Patch>");
                     return patches;
                 }
 
@@ -222,7 +288,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] XML parse error {filePath}: {ex.Message}");
+                UTF_Log.Error($"[UTF] XML parse error {filePath}: {ex.Message}");
             }
 
             return patches;
@@ -241,7 +307,7 @@ namespace UniversalTranslationFramework
                 
                 if (string.IsNullOrEmpty(targetType) || string.IsNullOrEmpty(targetMethod))
                 {
-                    Log.Warning($"[UTF] Skipping invalid patch operation: Missing targetType or targetMethod ({sourceFile})");
+                    UTF_Log.Warning($"[UTF] Skipping invalid patch operation: Missing targetType or targetMethod ({sourceFile})");
                     return null;
                 }
 
@@ -282,7 +348,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Failed to parse translation patch operation ({sourceFile}): {ex.Message}");
+                UTF_Log.Error($"[UTF] Failed to parse translation patch operation ({sourceFile}): {ex.Message}");
             }
 
             return null;
@@ -308,7 +374,7 @@ namespace UniversalTranslationFramework
                     var targetType = FindTypeWithStateMachineSupport(typeGroup.Key, firstPatch.TargetMethodName, firstPatch.TargetAssembly);
                     if (targetType == null)
                     {
-                        Log.Warning($"[UTF] Could not find target type: {typeGroup.Key}");
+                        UTF_Log.Warning($"[UTF] Could not find target type: {typeGroup.Key}");
                         failedCount += typeGroup.Count();
                         continue;
                     }
@@ -329,18 +395,18 @@ namespace UniversalTranslationFramework
                         catch (Exception ex)
                         {
                             failedCount++;
-                            Log.Error($"[UTF] Failed to apply translation patch {patch.TargetTypeName}.{patch.TargetMethodName}: {ex.Message}");
+                            UTF_Log.Error($"[UTF] Failed to apply translation patch {patch.TargetTypeName}.{patch.TargetMethodName}: {ex.Message}");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     failedCount += typeGroup.Count();
-                    Log.Error($"[UTF] Failed to process type group {typeGroup.Key}: {ex.Message}");
+                    UTF_Log.Error($"[UTF] Failed to process type group {typeGroup.Key}: {ex.Message}");
                 }
             }
 
-            Log.Message($"[UTF] Patch application complete: {appliedCount} succeeded, {failedCount} failed");
+            UTF_Log.Message($"[UTF] Patch application complete: {appliedCount} succeeded, {failedCount} failed");
         }
 
         /// <summary>
@@ -360,7 +426,7 @@ namespace UniversalTranslationFramework
                     // 如果是状态机类型，直接使用MoveNext
                     actualMethodName = "MoveNext";
                     targetMethod = AccessTools.Method(targetType, "MoveNext");
-                    Log.Message($"[UTF] Direct state machine type detected: {targetType.FullName}.MoveNext");
+                    UTF_Log.Message($"[UTF] Direct state machine type detected: {targetType.FullName}.MoveNext");
                 }
                 else
                 {
@@ -372,7 +438,7 @@ namespace UniversalTranslationFramework
                         // 3. 方法找到了，但检查是否需要使用状态机
                         if (IsIteratorMethod(targetMethod) || IsAsyncMethod(targetMethod))
                         {
-                            Log.Message($"[UTF] Found iterator/async method {targetType.FullName}.{patch.TargetMethodName}, searching for state machine...");
+                            UTF_Log.Message($"[UTF] Found iterator/async method {targetType.FullName}.{patch.TargetMethodName}, searching for state machine...");
 
                             // 查找对应的状态机类型
                             var stateMachineType = FindStateMachineType(targetType.FullName, patch.TargetMethodName);
@@ -384,29 +450,29 @@ namespace UniversalTranslationFramework
 
                                 if (targetMethod != null)
                                 {
-                                    Log.Message($"[UTF] ✓ Auto-converted {patch.TargetTypeName}.{patch.TargetMethodName} -> {stateMachineType.FullName}.MoveNext");
+                                    UTF_Log.Message($"[UTF] ✓ Auto-converted {patch.TargetTypeName}.{patch.TargetMethodName} -> {stateMachineType.FullName}.MoveNext");
                                 }
                                 else
                                 {
-                                    Log.Warning($"[UTF] Found state machine type but no MoveNext method: {stateMachineType.FullName}");
+                                    UTF_Log.Warning($"[UTF] Found state machine type but no MoveNext method: {stateMachineType.FullName}");
                                     return false;
                                 }
                             }
                             else
                             {
-                                Log.Message($"[UTF] Could not find state machine for iterator/async method, will patch original method");
+                                UTF_Log.Message($"[UTF] Could not find state machine for iterator/async method, will patch original method");
                                 // 保持原始方法，可能是非标准的迭代器实现
                             }
                         }
                         else
                         {
-                            // Log.Message($"[UTF] Regular method found: {targetType.FullName}.{patch.TargetMethodName}");
+                            UTF_Log.Message($"[UTF] Regular method found: {targetType.FullName}.{patch.TargetMethodName}");
                         }
                     }
                     else
                     {
                         // 4. 原始方法未找到，尝试状态机检测
-                        Log.Message($"[UTF] Method {patch.TargetTypeName}.{patch.TargetMethodName} not found, attempting state machine detection...");
+                        UTF_Log.Message($"[UTF] Method {patch.TargetTypeName}.{patch.TargetMethodName} not found, attempting state machine detection...");
 
                         var stateMachineType = FindStateMachineType(targetType.FullName, patch.TargetMethodName);
                         if (stateMachineType != null)
@@ -417,7 +483,7 @@ namespace UniversalTranslationFramework
 
                             if (targetMethod != null)
                             {
-                                Log.Message($"[UTF] ✓ Auto-discovered state machine: {stateMachineType.FullName}.MoveNext");
+                                UTF_Log.Message($"[UTF] ✓ Auto-discovered state machine: {stateMachineType.FullName}.MoveNext");
                             }
                         }
                     }
@@ -425,7 +491,7 @@ namespace UniversalTranslationFramework
 
                 if (targetMethod == null)
                 {
-                    Log.Warning($"[UTF] Could not find target method: {actualTargetType.FullName}.{actualMethodName}");
+                    UTF_Log.Warning($"[UTF] Could not find target method: {actualTargetType.FullName}.{actualMethodName}");
                     return false;
                 }
 
@@ -454,12 +520,12 @@ namespace UniversalTranslationFramework
                     ? $"safe mode (complex: {methodComplexity.IsComplex}, special: {requiresSpecialHandling})"
                     : "standard mode";
                     
-                Log.Message($"[UTF] Translation patch applied: {actualTargetType.FullName}.{actualMethodName} ({patch.Translations.Count} strings, {modeDescription})");
+                UTF_Log.Message($"[UTF] Translation patch applied: {actualTargetType.FullName}.{actualMethodName} ({patch.Translations.Count} strings, {modeDescription})");
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Exception in ApplyTranslationPatchOptimized: {ex}");
+                UTF_Log.Error($"[UTF] Exception in ApplyTranslationPatchOptimized: {ex}");
                 return false;
             }
         }
@@ -541,7 +607,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Warning($"[UTF] Failed to analyze method complexity for {method.Name}: {ex.Message}");
+                UTF_Log.Warning($"[UTF] Failed to analyze method complexity for {method.Name}: {ex.Message}");
                 // 如果分析失败，默认使用安全模式
                 return new MethodComplexityInfo { IsComplex = true };
             }
@@ -609,7 +675,7 @@ namespace UniversalTranslationFramework
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"[UTF] Error finding type {typeName}: {ex.Message}");
+                    UTF_Log.Error($"[UTF] Error finding type {typeName}: {ex.Message}");
                     return null;
                 }
             });
@@ -626,7 +692,7 @@ namespace UniversalTranslationFramework
                 var baseType = FindTypeOptimized(baseTypeName);
                 if (baseType == null)
                 {
-                    Log.Warning($"[UTF] Could not find base type: {baseTypeName}");
+                    UTF_Log.Warning($"[UTF] Could not find base type: {baseTypeName}");
                     return null;
                 }
 
@@ -651,7 +717,7 @@ namespace UniversalTranslationFramework
                     {
                         if (typeName.StartsWith(pattern))
                         {
-                            // Log.Message($"[UTF] Found state machine type: {nestedType.FullName}");
+                            // UTF_Log.Message($"[UTF] Found state machine type: {nestedType.FullName}");
                             return nestedType;
                         }
                     }
@@ -663,17 +729,17 @@ namespace UniversalTranslationFramework
                     var interfaces = nestedType.GetInterfaces();
                     if (interfaces.Any(i => i.Name == "IEnumerator" || i.Name == "IAsyncStateMachine"))
                     {
-                        Log.Message($"[UTF] Found state machine type by interface: {nestedType.FullName}");
+                        UTF_Log.Message($"[UTF] Found state machine type by interface: {nestedType.FullName}");
                         return nestedType;
                     }
                 }
 
-                Log.Warning($"[UTF] Could not find state machine type for {baseTypeName}.{methodName}");
+                UTF_Log.Warning($"[UTF] Could not find state machine type for {baseTypeName}.{methodName}");
                 return null;
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error finding state machine type for {baseTypeName}.{methodName}: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error finding state machine type for {baseTypeName}.{methodName}: {ex.Message}");
                 return null;
             }
         }
@@ -795,7 +861,8 @@ namespace UniversalTranslationFramework
                 // 检查方法是否存在
                 var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                 if (method == null)
-                    return true; // 如果方法不存在，可能是状态机方法
+                    return true;
+                // 如果方法不存在，可能是状态机方法
 
                 // 检查返回类型是否表明这是一个迭代器或异步方法
                 var returnType = method.ReturnType;
@@ -870,7 +937,8 @@ namespace UniversalTranslationFramework
             {
                 return false;
             }
-        }        /// <summary>
+        }
+        /// <summary>
         /// 检查方法是否是异步方法（使用 async/await）
         /// </summary>
         private static bool IsAsyncMethod(MethodInfo method)
@@ -880,7 +948,7 @@ namespace UniversalTranslationFramework
                 // Check if return type is Task or Task<T>
                 var returnType = method.ReturnType;
                 if (returnType == typeof(System.Threading.Tasks.Task) ||
-                    (returnType.IsGenericType && 
+                    (returnType.IsGenericType &&
                      returnType.GetGenericTypeDefinition() == typeof(System.Threading.Tasks.Task<>)))
                 {
                     // Further check: see if there is a corresponding state machine nested type
@@ -889,10 +957,10 @@ namespace UniversalTranslationFramework
                     {
                         var nestedTypes = declaringType.GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public);
                         var expectedStateMachineName = $"<{method.Name}>";
-                        
+
                         foreach (var nestedType in nestedTypes)
                         {
-                            if (nestedType.Name.Contains(expectedStateMachineName) && 
+                            if (nestedType.Name.Contains(expectedStateMachineName) &&
                                 (nestedType.Name.Contains("d__") || nestedType.Name.Contains("c__")))
                             {
                                 return true;
@@ -900,7 +968,7 @@ namespace UniversalTranslationFramework
                         }
                     }
                 }
-                
+
                 return false;
             }
             catch
@@ -927,7 +995,7 @@ namespace UniversalTranslationFramework
                 
                 if (problematicMethods.Contains(methodSignature))
                 {
-                    Log.Message($"[UTF] Method {methodSignature} is in problematic methods list, using safe mode");
+                    UTF_Log.Message($"[UTF] Method {methodSignature} is in problematic methods list, using safe mode");
                     return true;
                 }
                 
@@ -961,7 +1029,7 @@ namespace UniversalTranslationFramework
                         // 如果有超过 5 个连续的分支指令，认为需要特殊处理
                         if (maxConsecutiveBranches > 5)
                         {
-                            Log.Message($"[UTF] Method {methodSignature} has {maxConsecutiveBranches} consecutive branches, using safe mode");
+                            UTF_Log.Message($"[UTF] Method {methodSignature} has {maxConsecutiveBranches} consecutive branches, using safe mode");
                             return true;
                         }
                     }
@@ -971,7 +1039,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Warning($"[UTF] Error checking if method requires special handling: {ex.Message}");
+                UTF_Log.Warning($"[UTF] Error checking if method requires special handling: {ex.Message}");
                 return true; // 如果检测失败，默认使用安全模式
             }
         }
@@ -1045,7 +1113,7 @@ namespace UniversalTranslationFramework
             {
                 if (!File.Exists(originalXmlPath))
                 {
-                    Log.Error($"[UTF] Original XML file not found: {originalXmlPath}");
+                    UTF_Log.Error($"[UTF] Original XML file not found: {originalXmlPath}");
                     return;
                 }
 
@@ -1054,7 +1122,7 @@ namespace UniversalTranslationFramework
 
                 if (root?.Name != "Patch")
                 {
-                    Log.Error($"[UTF] Invalid patch file format: Root element must be <Patch>");
+                    UTF_Log.Error($"[UTF] Invalid patch file format: Root element must be <Patch>");
                     return;
                 }
 
@@ -1084,7 +1152,7 @@ namespace UniversalTranslationFramework
                         targetMethodElement.Value = "MoveNext"; // State machines usually use MoveNext method
 
                         hasConversions = true;
-                        Log.Message($"[UTF] Converted patch: {targetTypeName}.{targetMethodName} -> {stateMachineType.FullName}.MoveNext");
+                        UTF_Log.Message($"[UTF] Converted patch: {targetTypeName}.{targetMethodName} -> {stateMachineType.FullName}.MoveNext");
                     }
                 }
 
@@ -1092,16 +1160,16 @@ namespace UniversalTranslationFramework
                 {
                     var outputPath = outputXmlPath ?? Path.ChangeExtension(originalXmlPath, ".StateMachine.xml");
                     doc.Save(outputPath);
-                    Log.Message($"[UTF] Converted patch file saved to: {outputPath}");
+                    UTF_Log.Message($"[UTF] Converted patch file saved to: {outputPath}");
                 }
                 else
                 {
-                    Log.Message($"[UTF] No state machine conversions needed for: {originalXmlPath}");
+                    UTF_Log.Message($"[UTF] No state machine conversions needed for: {originalXmlPath}");
                 }
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error converting patch file: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error converting patch file: {ex.Message}");
             }
         }
 
@@ -1114,7 +1182,7 @@ namespace UniversalTranslationFramework
             {
                 if (!Directory.Exists(patchesDirectory))
                 {
-                    Log.Error($"[UTF] Patches directory not found: {patchesDirectory}");
+                    UTF_Log.Error($"[UTF] Patches directory not found: {patchesDirectory}");
                     return;
                 }
 
@@ -1133,15 +1201,15 @@ namespace UniversalTranslationFramework
                     }
                     catch (Exception ex)
                     {
-                        Log.Error($"[UTF] Failed to convert {xmlFile}: {ex.Message}");
+                        UTF_Log.Error($"[UTF] Failed to convert {xmlFile}: {ex.Message}");
                     }
                 }
 
-                Log.Message($"[UTF] Batch conversion completed: {conversionCount} files processed");
+                UTF_Log.Message($"[UTF] Batch conversion completed: {conversionCount} files processed");
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error in batch conversion: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error in batch conversion: {ex.Message}");
             }
         }
 
@@ -1203,7 +1271,7 @@ namespace UniversalTranslationFramework
                 // 确保框架已初始化
                 if (!_initialized)
                 {
-                    Log.Warning("[UTF] Framework not initialized, queueing patch operation");
+                    // UTF_Log.Warning("[UTF] Framework not initialized, queueing patch operation");
                     // 可以考虑将补丁加入队列等待初始化完成
                     return;
                 }
@@ -1212,7 +1280,7 @@ namespace UniversalTranslationFramework
                 var targetType = FindTypeWithStateMachineSupport(patch.TargetTypeName, patch.TargetMethodName, patch.TargetAssembly);
                 if (targetType == null)
                 {
-                    Log.Warning($"[UTF] Could not find target type for XML patch: {patch.TargetTypeName}");
+                    UTF_Log.Warning($"[UTF] Could not find target type for XML patch: {patch.TargetTypeName}");
                     return;
                 }
 
@@ -1221,7 +1289,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error applying patch operation from XML: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error applying patch operation from XML: {ex.Message}");
             }
         }
     }
@@ -1252,7 +1320,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error in PatchOperationStringTranslate: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error in PatchOperationStringTranslate: {ex.Message}");
                 return false;
             }
         }
@@ -1263,7 +1331,7 @@ namespace UniversalTranslationFramework
             {
                 if (string.IsNullOrEmpty(targetType) || string.IsNullOrEmpty(targetMethod))
                 {
-                    Log.Warning("[UTF] PatchOperationStringTranslate: targetType or targetMethod is empty");
+                    UTF_Log.Warning("[UTF] PatchOperationStringTranslate: targetType or targetMethod is empty");
                     return;
                 }
 
@@ -1279,7 +1347,7 @@ namespace UniversalTranslationFramework
 
                 if (translationMap.Count == 0)
                 {
-                    Log.Warning("[UTF] PatchOperationStringTranslate: No valid replacements found");
+                    UTF_Log.Warning("[UTF] PatchOperationStringTranslate: No valid replacements found");
                     return;
                 }
 
@@ -1301,7 +1369,7 @@ namespace UniversalTranslationFramework
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Error registering patch operation: {ex.Message}");
+                UTF_Log.Error($"[UTF] Error registering patch operation: {ex.Message}");
             }
         }
     }

@@ -69,17 +69,16 @@ namespace UniversalTranslationFramework
                         newInstructions.Add(instruction);
                     }
                 }
-
                 if (replacedCount > 0)
                 {
-                    Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId}");
+                    UTF_Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId}");
                 }
 
                 return newInstructions;
             }
             catch (Exception ex)
             {
-                Log.Warning($"[UTF] Transpiler failed for {methodId}, falling back to original: {ex.Message}");
+                UTF_Log.Warning($"[UTF] Transpiler failed for {methodId}, falling back to original: {ex.Message}");
                 // 如果转译失败，返回原始指令序列
                 return instructions;
             }
@@ -107,10 +106,10 @@ namespace UniversalTranslationFramework
             
             if (stringConstants.Count > 0)
             {
-                Log.Message($"[UTF DEBUG] {methodId} contains {stringConstants.Count} string constants:");
+                UTF_Log.Message($"[UTF DEBUG] {methodId} contains {stringConstants.Count} string constants:");
                 for (int i = 0; i < stringConstants.Count; i++)
                 {
-                    Log.Message($"  [{i}] \"{stringConstants[i]}\"");
+                    UTF_Log.Message($"  [{i}] \"{stringConstants[i]}\"");
                 }
             }
             
@@ -126,9 +125,9 @@ namespace UniversalTranslationFramework
             var result = ReplaceStrings(instructions, original);
             stopwatch.Stop();
             
-            if (stopwatch.ElapsedMilliseconds > 10) // Log if transpilation takes more than 10ms
+            if (stopwatch.ElapsedMilliseconds > 10) // UTF_Log if transpilation takes more than 10ms
             {
-                Log.Warning($"[UTF PERF] Slow transpilation for {original.DeclaringType?.FullName}.{original.Name}: {stopwatch.ElapsedMilliseconds}ms");
+                UTF_Log.Warning($"[UTF PERF] Slow transpilation for {original.DeclaringType?.FullName}.{original.Name}: {stopwatch.ElapsedMilliseconds}ms");
             }
             
             return result;
@@ -173,7 +172,7 @@ namespace UniversalTranslationFramework
                 
                 if (hasComplexFlow)
                 {
-                    Log.Message($"[UTF] Detected complex control flow in {methodId}, using safe mode");
+                    UTF_Log.Message($"[UTF] Detected complex control flow in {methodId}, using safe mode");
                     
                     // 对于复杂控制流，使用最安全的方式：只替换操作数，不创建新指令
                     for (int i = 0; i < instructionList.Count; i++)
@@ -218,15 +217,15 @@ namespace UniversalTranslationFramework
                 
                 if (replacedCount > 0)
                 {
-                    Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId} (complex flow: {hasComplexFlow})");
+                    UTF_Log.Message($"[UTF] Safely replaced {replacedCount} strings in {methodId} (complex flow: {hasComplexFlow})");
                 }
                 
                 return instructionList;
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF] Safe transpiler failed for {methodId}: {ex.Message}");
-                Log.Error($"[UTF] Stack trace: {ex.StackTrace}");
+                UTF_Log.Error($"[UTF] Safe transpiler failed for {methodId}: {ex.Message}");
+                UTF_Log.Error($"[UTF] Stack trace: {ex.StackTrace}");
                 // 如果连安全模式都失败，返回原始指令
                 return instructions;
             }
@@ -242,7 +241,7 @@ namespace UniversalTranslationFramework
             new Dictionary<string, System.Diagnostics.Stopwatch>();
 
         /// <summary>
-        /// Apply debug transpiler to the specified method to log string constants it contains.
+        /// Apply debug transpiler to the specified method to UTF_Log string constants it contains.
         /// </summary>
         /// <param name="targetType">Target type</param>
         /// <param name="methodName">Target method name</param>
@@ -253,7 +252,7 @@ namespace UniversalTranslationFramework
                 var method = AccessTools.Method(targetType, methodName);
                 if (method == null)
                 {
-                    Log.Error($"[UTF DEBUG] Cannot find method: {targetType.FullName}.{methodName}");
+                    UTF_Log.Error($"[UTF DEBUG] Cannot find method: {targetType.FullName}.{methodName}");
                     return;
                 }
 
@@ -261,11 +260,11 @@ namespace UniversalTranslationFramework
                 var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.DebugLogStrings));
                 harmony.Patch(method, transpiler: new HarmonyMethod(transpilerMethod));
                 
-                Log.Message($"[UTF DEBUG] Debug patch applied to {targetType.FullName}.{methodName}");
+                UTF_Log.Message($"[UTF DEBUG] Debug patch applied to {targetType.FullName}.{methodName}");
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF DEBUG] Error while debugging method: {ex.Message}");
+                UTF_Log.Error($"[UTF DEBUG] Error while debugging method: {ex.Message}");
             }
         }
 
@@ -279,7 +278,7 @@ namespace UniversalTranslationFramework
                 var method = AccessTools.Method(targetType, methodName);
                 if (method == null)
                 {
-                    Log.Error($"[UTF DEBUG] Cannot find method: {targetType.FullName}.{methodName}");
+                    UTF_Log.Error($"[UTF DEBUG] Cannot find method: {targetType.FullName}.{methodName}");
                     return;
                 }
 
@@ -287,11 +286,11 @@ namespace UniversalTranslationFramework
                 var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.MonitorPerformance));
                 harmony.Patch(method, transpiler: new HarmonyMethod(transpilerMethod));
                 
-                Log.Message($"[UTF DEBUG] Performance monitoring applied to {targetType.FullName}.{methodName}");
+                UTF_Log.Message($"[UTF DEBUG] Performance monitoring applied to {targetType.FullName}.{methodName}");
             }
             catch (Exception ex)
             {
-                Log.Error($"[UTF DEBUG] Error while applying performance monitoring: {ex.Message}");
+                UTF_Log.Error($"[UTF DEBUG] Error while applying performance monitoring: {ex.Message}");
             }
         }
 
@@ -300,7 +299,7 @@ namespace UniversalTranslationFramework
         /// </summary>
         public static void PrintCacheStats()
         {
-            Log.Message($"[UTF DEBUG] Translation cache stats: {TranslationCache.GetCacheStats()}");
+            UTF_Log.Message($"[UTF DEBUG] Translation cache stats: {TranslationCache.GetCacheStats()}");
         }
 
         /// <summary>
@@ -308,16 +307,16 @@ namespace UniversalTranslationFramework
         /// </summary>
         public static void PrintFrameworkStats()
         {
-            Log.Message($"[UTF DEBUG] Framework Status:");
-            Log.Message($"  Initialized: {TranslationFrameworkMod.IsInitialized}");
-            Log.Message($"  Loaded Patches: {TranslationFrameworkMod.LoadedPatchesCount}");
-            Log.Message($"  {TranslationCache.GetCacheStats()}");
+            UTF_Log.Message($"[UTF DEBUG] Framework Status:");
+            UTF_Log.Message($"  Initialized: {TranslationFrameworkMod.IsInitialized}");
+            UTF_Log.Message($"  Loaded Patches: {TranslationFrameworkMod.LoadedPatchesCount}");
+            UTF_Log.Message($"  {TranslationCache.GetCacheStats()}");
             
             // Memory usage information
             var memoryBefore = GC.GetTotalMemory(false);
             GC.Collect();
             var memoryAfter = GC.GetTotalMemory(true);
-            Log.Message($"  Memory Usage: {memoryAfter / 1024 / 1024}MB (freed {(memoryBefore - memoryAfter) / 1024}KB)");
+            UTF_Log.Message($"  Memory Usage: {memoryAfter / 1024 / 1024}MB (freed {(memoryBefore - memoryAfter) / 1024}KB)");
         }
 
         /// <summary>
@@ -334,7 +333,7 @@ namespace UniversalTranslationFramework
             }
             
             stopwatch.Stop();
-            Log.Message($"[UTF DEBUG] Benchmark: {iterations} cache operations in {stopwatch.ElapsedMilliseconds}ms " +
+            UTF_Log.Message($"[UTF DEBUG] Benchmark: {iterations} cache operations in {stopwatch.ElapsedMilliseconds}ms " +
                        $"({(double)stopwatch.ElapsedMilliseconds / iterations:F3}ms per operation)");
         }
     }
