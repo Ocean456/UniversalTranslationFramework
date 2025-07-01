@@ -259,11 +259,50 @@ namespace UniversalTranslationFramework
 
                     if (!string.IsNullOrEmpty(original) && !string.IsNullOrEmpty(translated))
                     {
-                        replacements.Add(new StringTranslation
+                        var translation = new StringTranslation
                         {
                             OriginalText = original,
                             TranslatedText = translated
-                        });
+                        };
+
+                        // Check for format string attributes
+                        var isFormatString = item.Attribute("isFormatString")?.Value;
+                        if (bool.TryParse(isFormatString, out bool formatFlag))
+                        {
+                            translation.IsFormatString = formatFlag;
+                        }
+                        else
+                        {
+                            // Auto-detect format strings
+                            translation.IsFormatString = FormatStringUtils.ContainsFormatPlaceholders(original);
+                        }
+
+                        // Check for regex attributes
+                        var isRegex = item.Attribute("isRegex")?.Value;
+                        if (bool.TryParse(isRegex, out bool regexFlag))
+                        {
+                            translation.IsRegex = regexFlag;
+                        }
+
+                        // Set pattern for regex translations
+                        if (translation.IsRegex)
+                        {
+                            translation.Pattern = item.Attribute("pattern")?.Value ?? original;
+                        }
+
+                        // Validate format string compatibility
+                        if (translation.IsFormatString)
+                        {
+                            if (!FormatStringUtils.ValidatePlaceholderCompatibility(original, translated))
+                            {
+                                Log.Warning($"[UTF] Format string placeholder mismatch in {sourceFile}: '{original}' -> '{translated}'");
+                            }
+                        }
+
+                        // Set context if provided
+                        translation.Context = item.Attribute("context")?.Value;
+
+                        replacements.Add(translation);
                     }
                 }
 
@@ -427,14 +466,26 @@ namespace UniversalTranslationFramework
 
                 // Build translation map using regular Dictionary (compatible approach)
                 var translationMap = new Dictionary<string, string>();
+                var formatTranslations = new List<StringTranslation>();
+                
                 foreach (var translation in patch.Translations)
                 {
-                    translationMap[translation.OriginalText] = translation.TranslatedText;
+                    // For exact match translations
+                    if (!translation.IsFormatString && !translation.IsRegex)
+                    {
+                        translationMap[translation.OriginalText] = translation.TranslatedText;
+                    }
+                    else
+                    {
+                        // For format strings and regex patterns
+                        formatTranslations.Add(translation);
+                    }
                 }
 
-                // Cache translation map
+                // Cache translation map and format patterns
                 var methodId = $"{actualTargetType.FullName}.{actualMethodName}";
                 TranslationCache.RegisterTranslations(methodId, translationMap);
+                TranslationCache.RegisterFormatPatterns(methodId, formatTranslations);
 
                 // Apply Harmony patch
                 var transpilerMethod = typeof(UniversalStringTranspiler).GetMethod(nameof(UniversalStringTranspiler.ReplaceStrings));

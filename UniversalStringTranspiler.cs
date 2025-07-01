@@ -44,13 +44,27 @@ namespace UniversalTranslationFramework
                 var instruction = instructionList[i];
                 
                 // Check if it's a string load instruction (ldstr)
-                if (instruction.opcode == OpCodes.Ldstr && 
-                    instruction.operand is string originalString &&
-                    translations.TryGetValue(originalString, out var translatedString))
+                if (instruction.opcode == OpCodes.Ldstr && instruction.operand is string originalString)
                 {
-                    // Replace with the translated string
-                    instructionList[i] = new CodeInstruction(OpCodes.Ldstr, translatedString);
-                    replacedCount++;
+                    string translatedString = null;
+                    
+                    // First try exact match (fastest)
+                    if (translations.TryGetValue(originalString, out translatedString))
+                    {
+                        // Replace with the translated string
+                        instructionList[i] = new CodeInstruction(OpCodes.Ldstr, translatedString);
+                        replacedCount++;
+                    }
+                    else
+                    {
+                        // Try format pattern matching
+                        translatedString = TranslationCache.TryFormatPatternMatch(methodId, originalString);
+                        if (translatedString != null)
+                        {
+                            instructionList[i] = new CodeInstruction(OpCodes.Ldstr, translatedString);
+                            replacedCount++;
+                        }
+                    }
                 }
             }
             

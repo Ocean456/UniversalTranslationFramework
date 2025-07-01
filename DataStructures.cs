@@ -83,6 +83,12 @@ namespace UniversalTranslationFramework
         /// <summary>Whether this translation uses regex matching</summary>
         public bool IsRegex { get; set; } = false;
 
+        /// <summary>Whether this translation is for format strings with placeholders</summary>
+        public bool IsFormatString { get; set; } = false;
+
+        /// <summary>Pattern for matching format strings (regex or wildcard)</summary>
+        public string Pattern { get; set; }
+
         /// <summary>Translation context or notes</summary>
         public string Context { get; set; }
 
@@ -92,8 +98,9 @@ namespace UniversalTranslationFramework
         public override string ToString()
         {
             var regexIndicator = IsRegex ? " (Regex)" : "";
+            var formatIndicator = IsFormatString ? " (Format)" : "";
             var qualityIndicator = QualityScore < 100 ? $" (Q:{QualityScore})" : "";
-            return $"'{OriginalText}' -> '{TranslatedText}'{regexIndicator}{qualityIndicator}";
+            return $"'{OriginalText}' -> '{TranslatedText}'{regexIndicator}{formatIndicator}{qualityIndicator}";
         }
 
         public override bool Equals(object obj)
@@ -123,6 +130,9 @@ namespace UniversalTranslationFramework
         private static readonly ConcurrentDictionary<string, ReadOnlyDictionary<string, string>> _methodTranslations 
             = new ConcurrentDictionary<string, ReadOnlyDictionary<string, string>>();
 
+        private static readonly ConcurrentDictionary<string, List<StringTranslation>> _formatStringPatterns
+            = new ConcurrentDictionary<string, List<StringTranslation>>();
+
         private static readonly ConcurrentDictionary<string, CacheMetrics> _cacheMetrics
             = new ConcurrentDictionary<string, CacheMetrics>();
 
@@ -142,6 +152,23 @@ namespace UniversalTranslationFramework
             
             _methodTranslations[methodId] = readOnlyTranslations;
             _cacheMetrics[methodId] = new CacheMetrics();
+        }
+
+        /// <summary>
+        /// Register format string patterns for a specific method.
+        /// </summary>
+        /// <param name="methodId">Method identifier</param>
+        /// <param name="formatTranslations">List of format string translations</param>
+        public static void RegisterFormatPatterns(string methodId, List<StringTranslation> formatTranslations)
+        {
+            if (formatTranslations == null || formatTranslations.Count == 0)
+                return;
+
+            var patterns = formatTranslations.Where(t => t.IsFormatString || t.IsRegex).ToList();
+            if (patterns.Count > 0)
+            {
+                _formatStringPatterns[methodId] = patterns;
+            }
         }
 
         /// <summary>
@@ -165,6 +192,56 @@ namespace UniversalTranslationFramework
             if (_cacheMetrics.TryGetValue(methodId, out var missMetrics))
             {
                 missMetrics.IncrementMiss();
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get format string patterns for a specific method.
+        /// </summary>
+        /// <param name="methodId">Method identifier</param>
+        /// <returns>List of format string translations, or null if not found</returns>
+        public static List<StringTranslation> GetFormatPatterns(string methodId)
+        {
+            return _formatStringPatterns.TryGetValue(methodId, out var patterns) ? patterns : null;
+        }
+
+        /// <summary>
+        /// Try to match a string against format patterns and return translated result.
+        /// </summary>
+        /// <param name="methodId">Method identifier</param>
+        /// <param name="inputString">String to match</param>
+        /// <returns>Translated string if pattern match found, null otherwise</returns>
+        public static string TryFormatPatternMatch(string methodId, string inputString)
+        {
+            var patterns = GetFormatPatterns(methodId);
+            if (patterns == null || patterns.Count == 0)
+                return null;
+
+            foreach (var pattern in patterns)
+            {
+                if (pattern.IsFormatString)
+                {
+                    var result = FormatStringUtils.TryMatchAndTranslate(inputString, pattern.OriginalText, pattern.TranslatedText);
+                    if (result != null)
+                        return result;
+                }
+                else if (pattern.IsRegex && !string.IsNullOrEmpty(pattern.Pattern))
+                {
+                    try
+                    {
+                        var regex = new System.Text.RegularExpressions.Regex(pattern.Pattern);
+                        if (regex.IsMatch(inputString))
+                        {
+                            return regex.Replace(inputString, pattern.TranslatedText);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore regex errors
+                    }
+                }
             }
 
             return null;
@@ -209,6 +286,7 @@ namespace UniversalTranslationFramework
         public static void ClearCache()
         {
             _methodTranslations.Clear();
+            _formatStringPatterns.Clear();
             _cacheMetrics.Clear();
         }
 
@@ -218,8 +296,9 @@ namespace UniversalTranslationFramework
         public static bool RemoveTranslations(string methodId)
         {
             var removed1 = _methodTranslations.TryRemove(methodId, out _);
-            var removed2 = _cacheMetrics.TryRemove(methodId, out _);
-            return removed1 || removed2;
+            var removed2 = _formatStringPatterns.TryRemove(methodId, out _);
+            var removed3 = _cacheMetrics.TryRemove(methodId, out _);
+            return removed1 || removed2 || removed3;
         }
 
         /// <summary>
@@ -326,6 +405,120 @@ namespace UniversalTranslationFramework
         public override string ToString()
         {
             return $"Hits: {Hits}, Misses: {Misses}, Hit Rate: {HitRate:P2}";
+        }
+    }
+
+    /// <summary>
+    /// Format string utilities for pattern matching and placeholder handling
+    /// </summary>
+    public static class FormatStringUtils
+    {
+        /// <summary>
+        /// Detects if a string contains format placeholders like {0}, {1}, etc.
+        /// </summary>
+        /// <param name="text">Text to check</param>
+        /// <returns>True if format placeholders are detected</returns>
+        public static bool ContainsFormatPlaceholders(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return false;
+
+            // Simple regex to detect {0}, {1}, etc.
+            return System.Text.RegularExpressions.Regex.IsMatch(text, @"\{\d+\}");
+        }
+
+        /// <summary>
+        /// Extracts format placeholder indices from a string
+        /// </summary>
+        /// <param name="text">Text to analyze</param>
+        /// <returns>List of placeholder indices found</returns>
+        public static List<int> ExtractPlaceholderIndices(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return new List<int>();
+
+            var indices = new List<int>();
+            var matches = System.Text.RegularExpressions.Regex.Matches(text, @"\{(\d+)\}");
+            
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                if (int.TryParse(match.Groups[1].Value, out int index))
+                {
+                    if (!indices.Contains(index))
+                        indices.Add(index);
+                }
+            }
+            
+            indices.Sort();
+            return indices;
+        }
+
+        /// <summary>
+        /// Validates that source and target format strings have compatible placeholders
+        /// </summary>
+        /// <param name="sourceText">Original format string</param>
+        /// <param name="targetText">Translated format string</param>
+        /// <returns>True if placeholders are compatible</returns>
+        public static bool ValidatePlaceholderCompatibility(string sourceText, string targetText)
+        {
+            var sourcePlaceholders = ExtractPlaceholderIndices(sourceText);
+            var targetPlaceholders = ExtractPlaceholderIndices(targetText);
+            
+            // Check that all placeholders in source exist in target
+            return sourcePlaceholders.All(p => targetPlaceholders.Contains(p));
+        }
+
+        /// <summary>
+        /// Creates a regex pattern from a format string for matching
+        /// </summary>
+        /// <param name="formatString">Format string with placeholders</param>
+        /// <returns>Regex pattern that can match the format string with any values</returns>
+        public static string CreateMatchingPattern(string formatString)
+        {
+            if (string.IsNullOrEmpty(formatString))
+                return string.Empty;
+
+            // Escape special regex characters except our placeholders
+            var escaped = System.Text.RegularExpressions.Regex.Escape(formatString);
+            
+            // Replace escaped placeholders with regex groups
+            escaped = System.Text.RegularExpressions.Regex.Replace(escaped, @"\\?\{(\d+)\\?\}", @"(.+?)");
+            
+            return $"^{escaped}$";
+        }
+
+        /// <summary>
+        /// Attempts to match a runtime string against a format pattern and extract values
+        /// </summary>
+        /// <param name="runtimeString">String to match</param>
+        /// <param name="formatPattern">Format pattern</param>
+        /// <param name="targetFormat">Target format string</param>
+        /// <returns>Formatted target string if match successful, null otherwise</returns>
+        public static string TryMatchAndTranslate(string runtimeString, string formatPattern, string targetFormat)
+        {
+            try
+            {
+                var pattern = CreateMatchingPattern(formatPattern);
+                var regex = new System.Text.RegularExpressions.Regex(pattern);
+                var match = regex.Match(runtimeString);
+                
+                if (!match.Success)
+                    return null;
+
+                // Extract captured values
+                var values = new List<string>();
+                for (int i = 1; i < match.Groups.Count; i++)
+                {
+                    values.Add(match.Groups[i].Value);
+                }
+
+                // Apply values to target format
+                return string.Format(targetFormat, values.ToArray());
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
